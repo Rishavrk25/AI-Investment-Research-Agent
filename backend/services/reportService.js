@@ -2,9 +2,15 @@ import { getFinanceData } from "./financeService.js";
 import { getCompanyInfo } from "./companyService.js";
 import { getCompanyNews } from "./newsService.js";
 import { generateAIReport } from "./aiService.js";
+import { getCached, setCached } from "../utils/cache.js";
 
 export const generateReport = async (companyName) => {
   try {
+
+    const cacheKey = companyName.toLowerCase().trim();
+    const cached = await getCached(cacheKey);
+    if (cached) return cached;
+
     // Step 1: Fetch financial data first (required to get the stock symbol)
     const finance = await getFinanceData(companyName);
 
@@ -23,6 +29,19 @@ export const generateReport = async (companyName) => {
 
     // Step 4: Generate AI analysis
     const aiGeneratedReport = await generateAIReport(researchData);
+
+    // Step 5: Cache the result
+    await setCached(cacheKey, {
+      status: "success",
+      researchData,
+      aiGeneratedReport,
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        dataSources: ["Yahoo Finance", "Wikidata", "NewsAPI"],
+        requestedCompany: companyName,
+        resolvedSymbol: finance.symbol,
+      },
+    });
 
     // Step 5: Return final report
     return {
